@@ -1,2 +1,2 @@
-# licenta-cirian-olaru
+# licenta-ciprian-olaru
 Repository proiect de licenta Ciprian Olaru.
