@@ -105,7 +105,7 @@ def start_video_feed(robot_ip, port=9559, motion_proxy=None):
         processed_image, colors_detected = detect_colors(image, adjusted_color_ranges)
         
         cv2.imshow("NAO Camera Feed", processed_image)
-        cv2.waitKey(1000)  # 1s image display
+        cv2.waitKey(5 * 1000)  # 5s image display
         
         video_proxy.unsubscribe(video_client)
         cv2.destroyAllWindows()
@@ -155,7 +155,7 @@ def main(robot_ip, port=9559):
                 "RShoulderPitch", "RShoulderRoll", "RElbowYaw", "RElbowRoll", "RWristYaw", "RHand"],
                 [angles["LShoulderPitch"], angles["LShoulderRoll"], angles["LElbowYaw"], angles["LElbowRoll"], angles["LWristYaw"], angles["LHand"],
                 angles["RShoulderPitch"], angles["RShoulderRoll"], angles["RElbowYaw"], angles["RElbowRoll"], angles["RWristYaw"], angles["RHand"]],
-                1.0
+                0.1
             )
 
             # waiting for cube placement
@@ -170,7 +170,7 @@ def main(robot_ip, port=9559):
             motion_proxy.angleInterpolationWithSpeed(
                 ["LHand", "RHand"],
                 [close_hand_angles["LHand"], close_hand_angles["RHand"]],
-                1.0
+                0.1
             )
             
             # starting the video feed
@@ -187,7 +187,7 @@ def main(robot_ip, port=9559):
             motion_proxy.angleInterpolationWithSpeed(
                 ["LHand", "RHand"],
                 [open_hand_angles["LHand"], open_hand_angles["RHand"]],
-                1.0
+                0.1
             )
 
             # wait for taking out the cube
