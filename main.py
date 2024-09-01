@@ -3,7 +3,6 @@ import time
 import cv2
 import numpy as np
 import requests
-from bs4 import BeautifulSoup
 
 # color codes
 COLOR_CODES = {
@@ -47,10 +46,8 @@ def detect_colors(image, color_ranges):
         section = hsv_image[y1:y2, x1:x2]
         section_color = detect_section_color(section, color_ranges)
         colors_detected.append(section_color)
-        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        cv2.putText(image, section_color, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         
-    return image, colors_detected
+    return colors_detected
 
 def detect_section_color(section, color_ranges):
     color_count = {}
@@ -102,13 +99,11 @@ def start_video_feed(robot_ip, port=9559, motion_proxy=None):
         image = np.frombuffer(array, dtype=np.uint8).reshape((height, width, 3))
         
         # color detection
-        processed_image, colors_detected = detect_colors(image, adjusted_color_ranges)
+        colors_detected = detect_colors(image, adjusted_color_ranges)
         
-        cv2.imshow("NAO Camera Feed", processed_image)
-        cv2.waitKey(5 * 1000)  # 5s image display
+        print("Colors detected:", colors_detected)
         
         video_proxy.unsubscribe(video_client)
-        cv2.destroyAllWindows()
         
         return colors_detected
         
@@ -175,7 +170,6 @@ def main(robot_ip, port=9559):
             
             # starting the video feed
             detected_colors = start_video_feed(robot_ip, port, motion_proxy)
-            print("Detected colors:", detected_colors)
             all_detected_colors.append(detected_colors)
             
             # releasing the cube
@@ -221,13 +215,20 @@ if __name__ == "__main__":
     print("Formatted scramble:", scramble)
 
     # HTTP GET request to localhost:8080/{scramble} (make sure you start the server for Rubiks2x2x2-OptimalSolver https://github.com/hkociemba/Rubiks2x2x2-OptimalSolver)
-    url = 'http://localhost:8080/{}'.format(scramble)
+    url = 'http://192.168.1.195:8080/{}'.format(scramble)
     try:
         response = requests.get(url)
         if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            body_text = soup.body.get_text() if soup.body else soup.get_text()
-            print(body_text.strip())
+            content = response.text
+
+            start = content.find("<body>") + len("<body>")
+            end = content.find("</body>")
+
+            body_text = content[start:end].strip()
+
+            clean_text = body_text.replace("<br>", "\n").replace("<br/>", "\n").replace("</br>", "\n")
+
+            print(clean_text.strip())
         else:
             print("Failed to get response from server, status code:", response.status_code)
     except Exception as e:
