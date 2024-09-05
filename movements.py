@@ -70,11 +70,15 @@ def turn_RPrime(motion_proxy):
     time.sleep(1)
 
     turn_angles = {
-        "RShoulderPitch": 0.7,
-        "RShoulderRoll": 0.1,
-        "RElbowYaw": 0.6,
-        "RElbowRoll": 1.5,
+        "RShoulderPitch": 0.5,  
+        "RShoulderRoll": 0,  
+        "RElbowYaw": 0.75,  
+        "RElbowRoll": 1.7,  
         "RWristYaw": 0.6 - np.pi / 2,
+
+        "LShoulderRoll": -0.1, 
+        "LElbowYaw": -0.7,
+        "LElbowRoll": -1.2,
     }
 
     motion_proxy.angleInterpolationWithSpeed(
@@ -110,11 +114,16 @@ def turn_L(motion_proxy):
     time.sleep(1)
 
     turn_angles = {
-        "LShoulderPitch": 0.7,
+        "LShoulderPitch": 0.6,
         "LShoulderRoll": -0.1,
-        "LElbowYaw": -0.6,
+        "LElbowYaw": -0.8,
         "LElbowRoll": -1.5,
         "LWristYaw": -0.6 + np.pi / 2,
+
+        "RShoulderRoll": 0.2,
+        "RElbowYaw": 0.7,
+        "RElbowRoll": 1.4,
+        "RWristYaw": 0.9
     }
 
     motion_proxy.angleInterpolationWithSpeed(

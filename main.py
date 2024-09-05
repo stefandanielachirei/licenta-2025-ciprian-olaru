@@ -3,6 +3,8 @@ import time
 import cv2
 import numpy as np
 import requests
+import socket
+import struct
 
 # color codes
 COLOR_CODES = {
@@ -46,6 +48,8 @@ def detect_colors(image, color_ranges):
         section = hsv_image[y1:y2, x1:x2]
         section_color = detect_section_color(section, color_ranges)
         colors_detected.append(section_color)
+        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.putText(image, section_color, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         
     return colors_detected
 
@@ -105,11 +109,28 @@ def start_video_feed(robot_ip, port=9559, motion_proxy=None):
         
         video_proxy.unsubscribe(video_client)
         
-        return colors_detected
+        return image, colors_detected
         
     except Exception as e:
         print("Error occurred: ", e)
         return []
+
+# sending images from the robot to the local computer
+def send_image_to_pc(image):
+    pc_ip = '192.168.1.195'
+    port = 8000
+
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.connect((pc_ip, port))
+
+    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 90]
+    result, image_encoded = cv2.imencode('.jpg', image, encode_param)
+
+    data = np.array(image_encoded)
+    string_data = data.tobytes()
+    client_socket.sendall(struct.pack(">L", len(string_data)) + string_data)
+
+    client_socket.close()
 
 def main(robot_ip, port=9559):
     try:
@@ -169,8 +190,10 @@ def main(robot_ip, port=9559):
             )
             
             # starting the video feed
-            detected_colors = start_video_feed(robot_ip, port, motion_proxy)
+            processed_image, detected_colors = start_video_feed(robot_ip, port, motion_proxy)
             all_detected_colors.append(detected_colors)
+            
+            send_image_to_pc(processed_image)
             
             # releasing the cube
             open_hand_angles = {

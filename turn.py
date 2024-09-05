@@ -11,11 +11,15 @@ def main(robot_ip, port=9559):
         time_lists = 1.0
         motion_proxy.stiffnessInterpolation(names, stiffness_lists, time_lists)
 
-        # perform R' turn
+        # position hands
         init_hands(motion_proxy)
         move_hands(motion_proxy, 0.45)
+
+        # make turn
         turn_RPrime(motion_proxy)
         # turn_L(motion_proxy)
+
+        # reposition hands
         move_hands(motion_proxy, 0.75)
         init_hands(motion_proxy)
 
