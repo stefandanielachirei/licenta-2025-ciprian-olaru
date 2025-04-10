@@ -13,8 +13,8 @@ def receive_images():
 
     print("Waiting for NAO...")
     
-    screen_width = 1920  
-    screen_height = 1080  
+    screen_width = 1920
+    screen_height = 1080
     
     offset = 20  
     window_width = (screen_width // 3) - (2 * offset // 3)

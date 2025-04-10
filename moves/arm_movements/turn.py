@@ -31,5 +31,5 @@ def main(robot_ip, port=9559):
         print("Error occurred: ", e)
 
 if __name__ == "__main__":
-    robot_ip = "192.168.1.100" 
+    robot_ip = "192.168.129.34" 
     main(robot_ip)

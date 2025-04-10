@@ -1,258 +1,62 @@
-from naoqi import ALProxy
 import time
-import cv2
-import numpy as np
-import requests
 import socket
-import struct
+from colors.color_recognition import detect_colors, format_scramble
+from moves.cube_solve.step1 import solve_step1
+from moves.cube_solve.step2 import solve_step2
+from moves.cube_solve.step3 import solve_step3
+from windows.window_player import launch_windows
 
-# color codes
-COLOR_CODES = {
-    'white': 'U',
-    'green': 'F',
-    'red': 'R',
-    'orange': 'L',
-    'blue': 'B',
-    'yellow': 'D'
-}
+robot_ip = "192.168.129.34"
 
-# color detection
-def adjust_color_ranges(color_ranges):
-    adjusted_color_ranges = {
-        'red': ((115, 50, 50), (130, 255, 255)),    # red ~ darker blue
-        'blue': color_ranges['red'],                # blue ~ red
-        'green': color_ranges['green'],             # green == green
-        'yellow': ((75, 50, 50), (95, 255, 255)),   # yellow == blue + green
-        'orange': ((100, 50, 50), (115, 255, 255)), # orange ~ lighter blue
-        'white': color_ranges['white']              # white == white
-    }
-    return adjusted_color_ranges
+def nao_intro():
+    print("NAO is introducing the Rubik's Cube and demonstrating basic moves.")
+    time.sleep(2)
 
-def detect_colors(image, color_ranges):
-    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    
-    # sections options
-    section_size = 100
-    spacing = 35
-    offset_x, offset_y = 225, 75
+def scramble_cube():
+    print("NAO is scrambling the cube.")
+    time.sleep(2)
 
-    sections = [
-        (offset_x, offset_y, offset_x + section_size, offset_y + section_size),
-        (offset_x + section_size + spacing, offset_y, offset_x + 2 * section_size + spacing, offset_y + section_size),
-        (offset_x, offset_y + section_size + spacing, offset_x + section_size, offset_y + 2 * section_size + spacing),
-        (offset_x + section_size + spacing, offset_y + section_size + spacing, offset_x + 2 * section_size + spacing, offset_y + 2 * section_size + spacing)
-    ]
-
-    colors_detected = []
-    for idx, (x1, y1, x2, y2) in enumerate(sections):
-        section = hsv_image[y1:y2, x1:x2]
-        section_color = detect_section_color(section, color_ranges)
-        colors_detected.append(section_color)
-        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        cv2.putText(image, section_color, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-        
-    return colors_detected
-
-def detect_section_color(section, color_ranges):
-    color_count = {}
-
-    for color_name, (lower, upper) in color_ranges.items():
-        mask = cv2.inRange(section, lower, upper)
-        count = cv2.countNonZero(mask)
-        color_count[color_name] = count
-    
-    detected_color = max(color_count, key=color_count.get)
-    return detected_color
-
-# video feed
-def start_video_feed(robot_ip, port=9559, motion_proxy=None):
-    try:
-        video_proxy = ALProxy("ALVideoDevice", robot_ip, port)
-        
-        resolution = 2    # 640x480
-        color_space = 11  # RGB
-        fps = 30
-        name = "video_feed"
-        
-        video_client = video_proxy.subscribeCamera(name, 1, resolution, color_space, fps)
-        
-        # original color ranges
-        color_ranges = {
-            'red': ((0, 50, 50), (10, 255, 255)),
-            'green': ((35, 50, 50), (85, 255, 255)),
-            'blue': ((100, 50, 50), (130, 255, 255)),
-            'yellow': ((25, 50, 50), (35, 255, 255)),
-            'orange': ((10, 50, 50), (25, 255, 255)),
-            'white': ((0, 0, 200), (180, 20, 255))
-        }
-
-        # color adjustment
-        adjusted_color_ranges = adjust_color_ranges(color_ranges)
-        
-        nao_image = video_proxy.getImageRemote(video_client)
-            
-        if nao_image is None:
-            print("Failed to get image from NAO camera")
-            return []
-            
-        width = nao_image[0]
-        height = nao_image[1]
-        array = nao_image[6]
-        
-        # OpenCV format
-        image = np.frombuffer(array, dtype=np.uint8).reshape((height, width, 3))
-        
-        # color detection
-        colors_detected = detect_colors(image, adjusted_color_ranges)
-        
-        print("Colors detected:", colors_detected)
-        
-        video_proxy.unsubscribe(video_client)
-        
-        return image, colors_detected
-        
-    except Exception as e:
-        print("Error occurred: ", e)
-        return []
-
-# sending images from the robot to the local computer
-def send_image_to_pc(image):
-    pc_ip = '192.168.1.195'
-    port = 8000
-
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect((pc_ip, port))
-
-    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 90]
-    result, image_encoded = cv2.imencode('.jpg', image, encode_param)
-
-    data = np.array(image_encoded)
-    string_data = data.tobytes()
-    client_socket.sendall(struct.pack(">L", len(string_data)) + string_data)
-
-    client_socket.close()
-
-def main(robot_ip, port=9559):
-    try:
-        motion_proxy = ALProxy("ALMotion", robot_ip, port)
-        
-        names = "Body"
-        stiffness_lists = 1.0
-        time_lists = 1.0
-
-        motion_proxy.stiffnessInterpolation(names, stiffness_lists, time_lists)
-        motion_proxy.setStiffnesses("LArm", 1.0)
-        motion_proxy.setStiffnesses("RArm", 1.0)
-
-        # angles settings
-        angles = {
-            "LShoulderPitch": 1.0,
-            "LShoulderRoll": -0.1,
-            "LElbowYaw": -1.0,
-            "LElbowRoll": -1.5,
-            "LWristYaw": -0.5,
-            "LHand": 0.75,
-
-            "RShoulderPitch": 1.0,
-            "RShoulderRoll": 0.1,
-            "RElbowYaw": 1.0,
-            "RElbowRoll": 1.5,
-            "RWristYaw": 0.5,
-            "RHand": 0.75
-        }
-
-        all_detected_colors = []
-        
-        # scanning all 6 faces
-        for _ in range(6):
-            # position for holding the Rubik's cube
-            motion_proxy.angleInterpolationWithSpeed(
-                ["LShoulderPitch", "LShoulderRoll", "LElbowYaw", "LElbowRoll", "LWristYaw", "LHand",
-                "RShoulderPitch", "RShoulderRoll", "RElbowYaw", "RElbowRoll", "RWristYaw", "RHand"],
-                [angles["LShoulderPitch"], angles["LShoulderRoll"], angles["LElbowYaw"], angles["LElbowRoll"], angles["LWristYaw"], angles["LHand"],
-                angles["RShoulderPitch"], angles["RShoulderRoll"], angles["RElbowYaw"], angles["RElbowRoll"], angles["RWristYaw"], angles["RHand"]],
-                0.1
-            )
-
-            # waiting for cube placement
-            time.sleep(5)
-
-            # gripping the cube
-            close_hand_angles = {
-                "LHand": 0.45,
-                "RHand": 0.45
-            }
-
-            motion_proxy.angleInterpolationWithSpeed(
-                ["LHand", "RHand"],
-                [close_hand_angles["LHand"], close_hand_angles["RHand"]],
-                0.1
-            )
-            
-            # starting the video feed
-            processed_image, detected_colors = start_video_feed(robot_ip, port, motion_proxy)
-            all_detected_colors.append(detected_colors)
-            
-            send_image_to_pc(processed_image)
-            
-            # releasing the cube
-            open_hand_angles = {
-                "LHand": 1.0,
-                "RHand": 1.0
-            }
-
-            motion_proxy.angleInterpolationWithSpeed(
-                ["LHand", "RHand"],
-                [open_hand_angles["LHand"], open_hand_angles["RHand"]],
-                0.1
-            )
-
-            # wait for taking out the cube
-            time.sleep(2)
-        
-        try:
-            motion_proxy.rest()
-        except Exception as e:
-            print("Stopping the robot failed: {}".format(str(e)))
-
-        return all_detected_colors
-        
-    except Exception as e:
-        print("Error occurred: ", e)
-        return []
-
-# creating the scramble
-def colors_to_string(colors):
-    return ''.join(COLOR_CODES[color] for color in colors)
-
-def format_scramble(detected_colors):
-    scramble_order = [4, 1, 0, 5, 3, 2]
-    scramble = ''.join(colors_to_string(detected_colors[i]) for i in scramble_order)
-    return scramble
-
-if __name__ == "__main__":
-    robot_ip = "192.168.1.100"
-    detected_colors = main(robot_ip)
-
+def run_color_recognition():
+    print("Starting color recognition...")
+    detected_colors = detect_colors(robot_ip)
     scramble = format_scramble(detected_colors)
     print("Formatted scramble:", scramble)
+    return scramble
 
-    # HTTP GET request to localhost:8080/{scramble} (make sure you start the server for Rubiks2x2x2-OptimalSolver https://github.com/hkociemba/Rubiks2x2x2-OptimalSolver)
-    url = 'http://192.168.1.195:8080/{}'.format(scramble)
+def solve_cube(scramble):
+    print("Solving cube with scramble:", scramble)
+    scramble_step1, move_history1 = solve_step1(scramble)
+    print("After step1, scramble:", scramble_step1)
+    print("Move history step1:", move_history1)
+    
+    scramble_step2, move_history2 = solve_step2(scramble_step1)
+    print("After step2, scramble:", scramble_step2)
+    print("Move history step2:", move_history2)
+    
+    scramble_final, move_history3 = solve_step3(scramble_step2)
+    print("After step3, final scramble:", scramble_final)
+    print("Move history step3:", move_history3)
+    
+    full_move_history = move_history1 + move_history2 + move_history3
+    print("Full move history:", full_move_history)
+    return full_move_history
+
+def trigger_window_sequence():
+    server_host = "127.0.0.1"
+    server_port = 5005
     try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            content = response.text
-
-            start = content.find("<body>") + len("<body>")
-            end = content.find("</body>")
-
-            body_text = content[start:end].strip()
-
-            clean_text = body_text.replace("<br>", "\n").replace("<br/>", "\n").replace("</br>", "\n")
-
-            print(clean_text.strip())
-        else:
-            print("Failed to get response from server, status code:", response.status_code)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((server_host, server_port))
+            message = "start_rubik_sequence"
+            s.sendall(message.encode("utf-8"))
+            print("Triggered window sequence with message:", message)
     except Exception as e:
-        print("Error occurred while making GET request:", e)
+        print("Failed to trigger window sequence:", e)
+
+if __name__ == "__main__":
+    nao_intro()
+    scramble_cube()
+    scramble = detect_colors(robot_ip)
+    solution_moves = solve_cube(scramble)
+    launch_windows()
+    print("Main sequence complete.")
