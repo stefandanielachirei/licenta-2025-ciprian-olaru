@@ -27,26 +27,32 @@ def get_down_sticker(corner_label, scramble):
 def is_bottom_solved(scramble):
     return all(letter == 'D' for letter in scramble[12:16])
 
-# check if the top face is solved
-def is_top_solved(scramble):
-    return all(letter == 'U' for letter in scramble[0:4])
+# check if the cube is in the solved state
+def is_solved(scramble):
+    faces = [scramble[i:i+4] for i in range(0, len(scramble), 4)]
+    return all(len(set(face)) == 1 for face in faces)
 
-# final adjustment for finishing off the cube
+# determine the final adjustment move for the top face
 def determine_final_adjustment(scramble):
-    if scramble == "UUUURRRRFFFFDDDDLLLLBBBB":
+    moves = []
+    for _ in range(4):
+        if is_solved(scramble):
+            print("Cube is solved.")
+            return " ".join(moves)
+        print("Cube not solved. Applying U move.")
+        scramble = apply_turns(scramble, "U")
+        moves.append("U")
+    
+    if is_solved(scramble):
+        print("Cube is solved after U moves.")
+        return " ".join(moves)
+    else:
+        print("Cube could not be solved with U moves.")
         return ""
-    elif scramble == "UUUUBBRRRRFFDDDDFFLLLLBB":
-        return "U'"
-    elif scramble == "UUUUFFRRLLFFDDDDBBLLRRBB":
-        return "U"
-    elif scramble == "UUUULLRRBBFFDDDDRRLLFFBB":
-        return "U2"
-    return None
 
 def solve_step3(scramble):
     print("=== Step 3: Finalizing the Cube ===")
-    
-    moves_sequence = [] 
+    moves_sequence = []
     
     scramble = rotate_cube(scramble, "z2")
     moves_sequence.append("z2")
@@ -55,30 +61,30 @@ def solve_step3(scramble):
     iteration = 0
     while not is_bottom_solved(scramble) and iteration < max_iterations:
         dfr_down = get_down_sticker("DFR", scramble)
-        print(f"DFR corner down sticker: {dfr_down}")
+        print(f"DFR down sticker: {dfr_down}")
         if dfr_down != 'D':
-            print("DFR corner is not yellow. Applying face move: R U R' U'")
+            print("DFR is not yellow. Applying face move: R U R' U'")
             scramble = apply_turns(scramble, "R U R' U'")
             moves_sequence.extend(["R", "U", "R'", "U'"])
         else:
-            print("DFR corner is yellow. Applying D move.")
+            print("DFR is yellow. Applying D move.")
             scramble = apply_turns(scramble, "D")
             moves_sequence.append("D")
         iteration += 1
+        print(f"After iteration {iteration}:")
     
     if not is_bottom_solved(scramble):
         print("Bottom face not solved after maximum iterations.")
     else:
         print("Bottom face is solved.")
     
-    final_adjustment = determine_final_adjustment(scramble)
-    print(f"Final adjustment move: {final_adjustment}")
-    if final_adjustment:
-        print(f"Top face not solved. Applying {final_adjustment} move for final adjustment.")
-        scramble = apply_turns(scramble, final_adjustment)
-        moves_sequence.append(final_adjustment)
+    final_move = determine_final_adjustment(scramble)
+    print(f"Final adjustment move: {final_move}")
+    if final_move:
+        scramble = apply_turns(scramble, final_move)
+        moves_sequence.append(final_move)
     else:
-        print("Top face is solved.")
+        print("No final top adjustment needed.")
     
     print("=== Step 3 Complete ===")
     return scramble, moves_sequence
